@@ -21,6 +21,15 @@ class FMainClass extends GSInfo {
 			flags = CONFIG_NONE | CONFIG_INGAME
 		});
 
+		AddSetting({
+			name = "all_cargo_and_towns",
+			description = "ID of the cargo to track",
+			default_value = 0,
+			min_value = 0,
+			max_value = 1,
+			flags = CONFIG_NONE | CONFIG_INGAME
+		});
+		AddLabels("all_cargo_and_towns", {_0 = "Only use above chosen cargo", _1 = "Do all cargos, and all towns, instead"});
 		// This is for a possable future feature
 		// AddSetting({
 		// 	name = "use_points_scoring",

@@ -5,6 +5,7 @@ class MainClass extends GSController
 
 	// Settings
 	cargo_id = 0;
+	delivery_processing_method = 0;
 
 	// Data
 	company_delivered_cargo = {};
@@ -48,6 +49,7 @@ function MainClass::Init()
 	GSLog.Info("");
 
 	this.cargo_id = GSController.GetSetting("cargo_id");
+	this.delivery_processing_method = GSController.GetSetting("all_cargo_and_towns");
 	GSLog.Info("Selected cargo id: " + this.cargo_id);
 	GSLog.Info("");
 
@@ -163,48 +165,76 @@ function MainClass::DoMonthLoop()
 	this.cargo_id = GSController.GetSetting("cargo_id");
 
 	for (local company_id = GSCompany.COMPANY_FIRST; company_id < GSCompany.COMPANY_LAST; company_id++) {
-		if (GSCompany.ResolveCompanyID(company_id) != GSCompany.COMPANY_INVALID) {
+		if (GSCompany.ResolveCompanyID(company_id) == GSCompany.COMPANY_INVALID) continue;
 
-			// Check company has HQ
-			local tile_index  = GSCompany.GetCompanyHQ(company_id)
-			if (tile_index == GSMap.TILE_INVALID){
-				continue;
-			}
-			// Update the name
-			// To-Do REMOVE AFTER V15
-			local company_name = GSCompany.GetName(company_id);
-			GSLeagueTable.UpdateElementData(
-				this.company_league_table_element_ids[company_id],
-				company_id,
-				company_name,
-				GSLeagueTable.LINK_COMPANY,
-				company_id
-			)
-			this.company_names[company_id] <- company_name;
+		local cargo_delivery_amount = 0
+		if (this.delivery_processing_method == 0) {
+			cargo_delivery_amount = this.ProcessHeadQuartersTownDeliveries(company_id);
+		} else {
+			cargo_delivery_amount = this.ProcessAllCargoAllTownDeliveries(company_id);
+		}
+		// Update the name
+		// To-Do REMOVE AFTER V15
+		local company_name = GSCompany.GetName(company_id);
+		GSLeagueTable.UpdateElementData(
+			this.company_league_table_element_ids[company_id],
+			company_id,
+			company_name,
+			GSLeagueTable.LINK_COMPANY,
+			company_id
+		)
+		this.company_names[company_id] <- company_name;
 
-			// Get delivery amount
-			local town_id = GSTile.GetClosestTown(tile_index);
-			local cargo_delivery_amount = GSCargoMonitor.GetTownDeliveryAmount(
-				company_id,
-				this.cargo_id,
-				town_id,
-				true
-			);
+		// Debug cargo delivered info
+		// GSLog.Info(company_name + " delivered " + cargo_delivery_amount);
 
-			// Debug cargo delivered info
-			// GSLog.Info(company_name + " delivered " + cargo_delivery_amount);
+		// Update the league table
+		local previous_deliverd_cargo = this.company_delivered_cargo[company_id];
+		local new_cargo_delivery_amount = previous_deliverd_cargo + cargo_delivery_amount;
+		this.company_delivered_cargo[company_id] <- new_cargo_delivery_amount;
+		GSLeagueTable.UpdateElementScore(
+			this.company_league_table_element_ids[company_id],
+			this.company_delivered_cargo[company_id],
+			"" + this.company_delivered_cargo[company_id]
+		);
+	}
+}
 
-			// Update the league table
-			local previous_deliverd_cargo = this.company_delivered_cargo[company_id];
-			local new_cargo_delivery_amount = previous_deliverd_cargo + cargo_delivery_amount;
-			this.company_delivered_cargo[company_id] <- new_cargo_delivery_amount;
-			GSLeagueTable.UpdateElementScore(
-				this.company_league_table_element_ids[company_id],
-				this.company_delivered_cargo[company_id],
-				"" + this.company_delivered_cargo[company_id]
-			);
+function MainClass::ProcessHeadQuartersTownDeliveries(company_id) {
+	// Check company has HQ
+	local tile_index  = GSCompany.GetCompanyHQ(company_id)
+	if (tile_index == GSMap.TILE_INVALID) {
+		//continue;
+		return 0;
+	}
+
+	// Get delivery amount
+	local town_id = GSTile.GetClosestTown(tile_index);
+	local total_deliveries = GSCargoMonitor.GetTownDeliveryAmount(
+		company_id,
+		this.cargo_id,
+		town_id,
+		true
+	);
+	return total_deliveries;
+}
+function MainClass::ProcessAllCargoAllTownDeliveries(company_id) {
+	local total_deliveries = 0;
+	local all_towns = GSTownList();
+	local all_cargo = GSCargoList();
+
+	foreach(townkey, townval in all_towns) {
+		foreach(cargokey, cargoval in all_cargo) {
+			total_deliveries = total_deliveries +
+				GSCargoMonitor.GetTownDeliveryAmount(
+					company_id,
+					cargokey,
+					townkey,
+					true
+				);
 		}
 	}
+	return total_deliveries;
 }
 
 function MainClass::Save() {
